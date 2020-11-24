@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.IO;
 
-namespace ConsoleApp6
+namespace McMotd
 {
     class Program
     {
@@ -20,23 +20,36 @@ namespace ConsoleApp6
             string ip = string.Empty;
             string _port =" 19132";
             HttpListener listener = new HttpListener();
-            listener.Prefixes.Add("http://localhost:"+config.Port+config.Prefix);
+            string address = "http://+:" + config.Port + config.Prefix;
+            listener.Prefixes.Add(address);
             listener.Start();
-            Console.WriteLine("[INFO] 服务器已开启");
+            Console.WriteLine("[INFO] 服务器已开启:"+address);
             while (true)
             {
                 HttpListenerContext context = listener.GetContext();
-                ip = context.Request.QueryString["ip"] ?? string.Empty;
-                _port = context.Request.QueryString["port"] ?? "19132";
-                HttpListenerRequest request = context.Request;
-                HttpListenerResponse response = context.Response;
-                string responseString = "<HTML><BODY> " + MotdPe(ip, Convert.ToInt32(_port)) ?? string.Empty + "</BODY></HTML>";
-                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-                response.ContentLength64 = buffer.Length;
-                System.IO.Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-                output.Close();
-                Console.WriteLine("[INFO] {0} {1} Ip:{2}请求查询{3}:{4}", DateTime.Now.ToLongDateString(),DateTime.Now.ToLongTimeString(), request.RemoteEndPoint.Address.ToString(), ip, _port);
+                Task.Run(() =>
+                {
+                    ip = context.Request.QueryString["ip"] ?? string.Empty;
+                    _port = context.Request.QueryString["port"] ?? "19132";
+                    int port = 19132;
+                    HttpListenerRequest request = context.Request;
+                    HttpListenerResponse response = context.Response;
+                    response.ContentType = "application/json;charset=UTF-8";
+                    response.ContentEncoding = Encoding.UTF8;
+                    try
+                    {
+                        port = Convert.ToInt32(_port);
+                    }
+                    catch { port = 19132; };
+                    string responseString = MotdPe(ip, port) ?? "{}";
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
+                    response.ContentLength64 = buffer.Length;
+                    System.IO.Stream output = response.OutputStream;
+                    output.Write(buffer, 0, buffer.Length);
+                    response.StatusCode = 200;
+                    output.Close();
+                    Console.WriteLine("[{0} {1} INFO]IP:{2}请求查询{3}:{4}", DateTime.Now.ToLongDateString(), DateTime.Now.ToLongTimeString(), request.RemoteEndPoint.Address.ToString(), ip, port);
+                });
             }
         }
         static Config ReadConfig() 
@@ -64,6 +77,10 @@ namespace ConsoleApp6
         }
         static string MotdPe(string ip, int port=19132)
         {
+            if (port > 65535) 
+            {
+                port = port % 65535;
+            }
             var json = new JObject();
             try
             {
@@ -100,6 +117,7 @@ namespace ConsoleApp6
                 json.Add(new JProperty("nintendoLimited", res[7]));
                 json.Add(new JProperty("ipv4Port", res[8]));
                 json.Add(new JProperty("ipv6Port", res[9]));
+                json.Add(new JProperty("rawText", r));
             }
             catch
             {
