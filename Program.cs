@@ -83,10 +83,6 @@ namespace McMotd
         }
         static string MotdPe(string ip, int port=19132)
         {
-            if (port > 65535) 
-            {
-                port = port % 65535;
-            }
             var json = new JObject();
             try
             {
